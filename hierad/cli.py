@@ -26,14 +26,14 @@ def main():
     trans_p.add_argument("--output")
     trans_p.add_argument("--model", default="base")
     trans_p.add_argument("--language")
-    trans_p.add_argument("--asr-backend", choices=["auto", "service", "local"], default="auto")
+    trans_p.add_argument("--asr-backend", choices=["auto", "service", "local", "dashscope"], default="auto")
     trans_p.add_argument("--asr-url")
 
     run_p = sub.add_parser("run", help="运行 v2 描述流水线")
     run_p.add_argument("--video", required=True)
     run_p.add_argument("--whisper")
     run_p.add_argument("--work-dir", default="./work_dir")
-    run_p.add_argument("--asr-backend", choices=["auto", "service", "local"], default="auto")
+    run_p.add_argument("--asr-backend", choices=["auto", "service", "local", "dashscope"], default="auto")
     run_p.add_argument("--asr-url")
     run_p.add_argument("--min-gap", type=float, default=3.0, help="最短 AD 间隙（秒），默认 3")
 
@@ -57,9 +57,12 @@ def main():
     run_p.add_argument("--vlm-url")
     run_p.add_argument("--vlm-type")
     run_p.add_argument("--vlm-endpoint")
+    run_p.add_argument("--vlm-provider", choices=["local", "dashscope"], help="默认 local（本机 VLM 服务）")
     run_p.add_argument("--llm-url")
     run_p.add_argument("--llm-model")
     run_p.add_argument("--llm-api-key")
+    run_p.add_argument("--llm-provider", choices=["local", "dashscope"], help="默认 local（本机 LLM 服务）")
+    run_p.add_argument("--tts-provider", choices=["local", "dashscope"], help="默认 local（本机 CosyVoice）")
     run_p.add_argument(
         "--burn-ad",
         dest="burn_ad",
@@ -137,6 +140,8 @@ def main():
     args = parser.parse_args()
 
     if args.command == "transcribe":
+        if args.asr_backend == "dashscope":
+            os.environ["HIERAD_ASR_PROVIDER"] = "dashscope"
         result = transcribe_video(
             video_path=args.video,
             output_json_path=args.output,
@@ -150,6 +155,14 @@ def main():
 
     elif args.command == "run":
         os.environ["HIERAD_FACE_GPU"] = str(args.face_gpu)
+        if getattr(args, "vlm_provider", None):
+            os.environ["HIERAD_VLM_PROVIDER"] = args.vlm_provider
+        if getattr(args, "llm_provider", None):
+            os.environ["HIERAD_LLM_PROVIDER"] = args.llm_provider
+        if getattr(args, "tts_provider", None):
+            os.environ["HIERAD_TTS_PROVIDER"] = args.tts_provider
+        if args.asr_backend == "dashscope":
+            os.environ["HIERAD_ASR_PROVIDER"] = "dashscope"
         work_dir = Path(args.work_dir)
         whisper_path = args.whisper
         if not whisper_path:

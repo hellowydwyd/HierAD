@@ -13,7 +13,12 @@ import json
 from pathlib import Path
 from typing import Callable, Dict, List, Optional, Tuple
 
-from .config import VLM_URL, VLM_TYPE, VLM_ENDPOINT, LLM_BASE_URL, LLM_MODEL, LLM_API_KEY
+from .config import (
+    VLM_ENDPOINT,
+    VLM_TYPE,
+    VLM_URL,
+    resolve_llm_settings,
+)
 from .progress import ProgressCallback, ProgressReporter
 from .preprocess import (
     ASRResult,
@@ -109,20 +114,17 @@ def ensure_annotated_video(
 
 
 def _clip_descriptions_to_json(clips) -> list:
-    return [
-        {
-            "clip_idx": c.clip_idx,
-            "timecode": f"{c.timecode_start} --> {c.timecode_end}",
-            "start_sec": c.start_sec,
-            "end_sec": c.end_sec,
-            "setting": c.setting,
-            "characters": c.characters,
-            "action": c.action,
-            "dialogue_overlap": c.dialogue_overlap,
-            "video_path": c.video_path,
-        }
-        for c in clips
-    ]
+    return [c.to_dict() if hasattr(c, "to_dict") else {
+        "clip_idx": c.clip_idx,
+        "timecode": f"{c.timecode_start} --> {c.timecode_end}",
+        "start_sec": c.start_sec,
+        "end_sec": c.end_sec,
+        "setting": c.setting,
+        "characters": c.characters,
+        "action": c.action,
+        "dialogue_overlap": c.dialogue_overlap,
+        "video_path": c.video_path,
+    } for c in clips]
 
 
 def _global_context_to_json(ctx) -> dict:
@@ -284,22 +286,27 @@ def run_pipeline(
     if not role_mapping and canonical_characters_path:
         role_mapping = load_canonical_mapping(Path(canonical_characters_path))
 
+    llm_url_r, llm_model_r, llm_key_r = resolve_llm_settings(
+        url=llm_url, model=llm_model, api_key=llm_api_key
+    )
+    stage1_ckpt = work_dir / "stage1_clip_descriptions.json"
     stage1 = Stage1SceneUnderstanding(
         vlm_url=vlm_url or VLM_URL,
         vlm_type=vlm_type or VLM_TYPE,
         vlm_endpoint=vlm_endpoint or VLM_ENDPOINT,
-        llm_url=llm_url or LLM_BASE_URL,
-        llm_model=llm_model or LLM_MODEL,
-        llm_api_key=llm_api_key or LLM_API_KEY,
+        llm_url=llm_url_r,
+        llm_model=llm_model_r,
+        llm_api_key=llm_key_r,
         canonical_characters=role_mapping,
     )
     clip_descs, global_ctx = stage1.process(
         scene_manifest["clips"],
         reporter=reporter,
+        checkpoint_path=str(stage1_ckpt),
     )
     _stage("Stage1", done=True, clip_count=len(clip_descs))
 
-    with open(work_dir / "stage1_clip_descriptions.json", "w", encoding="utf-8") as f:
+    with open(stage1_ckpt, "w", encoding="utf-8") as f:
         json.dump(_clip_descriptions_to_json(clip_descs), f, ensure_ascii=False, indent=2)
     with open(work_dir / "stage1_global_context.json", "w", encoding="utf-8") as f:
         json.dump(_global_context_to_json(global_ctx), f, ensure_ascii=False, indent=2)
@@ -355,9 +362,9 @@ def run_pipeline(
         json.dump(_ad_segments_to_json(ad_segments), f, ensure_ascii=False, indent=2)
 
     stage3 = Stage3Refiner(
-        llm_url=llm_url or LLM_BASE_URL,
-        llm_model=llm_model or LLM_MODEL,
-        llm_api_key=llm_api_key or LLM_API_KEY,
+        llm_url=llm_url_r,
+        llm_model=llm_model_r,
+        llm_api_key=llm_key_r,
         canonical_characters=role_mapping,
     )
     ad_scripts = stage3.process(ad_segments, global_ctx, reporter=reporter)
@@ -398,9 +405,9 @@ def run_pipeline(
                 voice_name=tts_voice_name,
                 spk_id=tts_spk_id,
                 speed=tts_speed,
-                llm_url=llm_url,
-                llm_model=llm_model,
-                llm_api_key=llm_api_key,
+                llm_url=llm_url_r,
+                llm_model=llm_model_r,
+                llm_api_key=llm_key_r,
             )
             _stage("AD 压制", done=True, **ad_export)
         except Exception as e:

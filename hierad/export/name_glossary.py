@@ -16,7 +16,7 @@ from difflib import SequenceMatcher
 from pathlib import Path
 from typing import Dict, List, Optional, Sequence
 
-from hierad.config import LLM_API_KEY, LLM_BASE_URL, LLM_MODEL, get_openai_client
+from hierad.config import get_openai_client, resolve_llm_settings
 
 # 模糊匹配阈值：ratio >= 0.85 视为同一名字的拼写变体
 _FUZZY_THRESHOLD = 0.85
@@ -63,11 +63,9 @@ def generate_zh_glossary(
     """用 LLM 一次性翻译角色名列表，返回 {English: Chinese}。"""
     if not names:
         return {}
-    client = get_openai_client(
-        api_key=llm_api_key or LLM_API_KEY,
-        base_url=llm_url or LLM_BASE_URL,
-    )
-    model = llm_model or LLM_MODEL
+    _, resolved_model, _ = resolve_llm_settings(url=llm_url, model=llm_model, api_key=llm_api_key)
+    client = get_openai_client(api_key=llm_api_key, base_url=llm_url)
+    model = llm_model or resolved_model
     name_list = "\n".join(f"{i+1}. {n}" for i, n in enumerate(names))
     system = (
         "You are a professional film translator. "

@@ -37,6 +37,43 @@ class ClipDescription:
             parts.append(self.action)
         return " ".join(parts) if parts else self.raw
 
+    def is_complete(self) -> bool:
+        return bool((self.action or "").strip() or (self.setting or "").strip())
+
+    def to_dict(self) -> dict:
+        return {
+            "clip_idx": self.clip_idx,
+            "timecode": f"{self.timecode_start} --> {self.timecode_end}",
+            "timecode_start": self.timecode_start,
+            "timecode_end": self.timecode_end,
+            "start_sec": self.start_sec,
+            "end_sec": self.end_sec,
+            "setting": self.setting,
+            "characters": self.characters,
+            "action": self.action,
+            "raw": self.raw,
+            "dialogue_overlap": self.dialogue_overlap,
+            "video_path": self.video_path,
+        }
+
+    @classmethod
+    def from_dict(cls, data: dict) -> "ClipDescription":
+        tc = data.get("timecode") or ""
+        parts = tc.split(" --> ") if " --> " in tc else ["", ""]
+        return cls(
+            clip_idx=int(data.get("clip_idx", 0)),
+            timecode_start=str(data.get("timecode_start") or (parts[0] if parts else "")),
+            timecode_end=str(data.get("timecode_end") or (parts[1] if len(parts) > 1 else "")),
+            start_sec=float(data.get("start_sec", 0)),
+            end_sec=float(data.get("end_sec", 0)),
+            setting=str(data.get("setting") or ""),
+            characters=str(data.get("characters") or ""),
+            action=str(data.get("action") or ""),
+            raw=str(data.get("raw") or ""),
+            dialogue_overlap=str(data.get("dialogue_overlap") or ""),
+            video_path=str(data.get("video_path") or ""),
+        )
+
 
 # 兼容旧名
 DenseDescription = ClipDescription

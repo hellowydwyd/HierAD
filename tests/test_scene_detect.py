@@ -25,10 +25,10 @@ def test_assign_segment_to_scene():
 
 def test_aggregate_descriptions_by_scenes():
     descs = [
-        DenseDescription(0, "00:00:00.000", "00:00:05.000", "A", "X", "a", ""),
-        DenseDescription(1, "00:00:05.000", "00:00:10.000", "A", "X", "b", ""),
-        DenseDescription(2, "00:00:12.000", "00:00:18.000", "B", "Y", "c", ""),
-        DenseDescription(3, "00:00:20.000", "00:00:28.000", "B", "Y", "d", ""),
+        DenseDescription(0, "00:00:00.000", "00:00:05.000", 0.0, 5.0, "A", "X", "a", ""),
+        DenseDescription(1, "00:00:05.000", "00:00:10.000", 5.0, 10.0, "A", "X", "b", ""),
+        DenseDescription(2, "00:00:12.000", "00:00:18.000", 12.0, 18.0, "B", "Y", "c", ""),
+        DenseDescription(3, "00:00:20.000", "00:00:28.000", 20.0, 28.0, "B", "Y", "d", ""),
     ]
     ranges = [(0.0, 10.0), (10.0, 30.0)]
     scenes = aggregate_descriptions_by_scenes(descs, ranges)
@@ -42,7 +42,7 @@ def test_aggregate_descriptions_by_scenes():
 def test_stage2_aggregate_fixed_window_fallback():
     """无 video_path 时使用固定窗口兜底"""
     descs = [
-        DenseDescription(i, "00:00:00", "00:00:05", "Kitchen", "JOHN", "action", "")
+        DenseDescription(i, "00:00:00", "00:00:05", 0.0, 5.0, "Kitchen", "JOHN", "action", "")
         for i in range(10)
     ]
     s2 = Stage2Understanding(use_scenedetect=True, use_llm=False, scene_window=3)

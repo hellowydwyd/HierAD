@@ -74,7 +74,7 @@ def test_normalize_character_with_mapping():
 def test_stage2_aggregate_fixed_window():
     """测试 Stage2 固定窗口场景聚合（无 PySceneDetect 视频路径）"""
     descs = [
-        DenseDescription(i, "00:00:00", "00:00:05", "Kitchen", "JOHN", "action", "")
+        DenseDescription(i, "00:00:00", "00:00:05", 0.0, 5.0, "Kitchen", "JOHN", "action", "")
         for i in range(10)
     ]
     s2 = Stage2Understanding(use_scenedetect=False, use_llm=False, scene_window=3)

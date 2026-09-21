@@ -7,7 +7,7 @@ from __future__ import annotations
 import re
 from typing import Dict, List, Optional, Sequence
 
-from hierad.config import LLM_API_KEY, LLM_BASE_URL, LLM_MODEL, get_openai_client
+from hierad.config import get_openai_client, resolve_llm_settings
 
 from .name_glossary import (
     enforce_glossary_in_zh,
@@ -136,8 +136,9 @@ def translate_texts_to_zh(
     """
     if not texts:
         return []
-    client = get_openai_client(api_key=llm_api_key or LLM_API_KEY, base_url=llm_url or LLM_BASE_URL)
-    model = llm_model or LLM_MODEL
+    _, resolved_model, _ = resolve_llm_settings(url=llm_url, model=llm_model, api_key=llm_api_key)
+    client = get_openai_client(api_key=llm_api_key, base_url=llm_url)
+    model = llm_model or resolved_model
     system_prompt = _TRANSLATE_SYSTEM.format(
         glossary_section=_build_glossary_section(glossary)
     )

@@ -19,9 +19,13 @@ from typing import List, Dict, Any, Optional, Literal, Callable
 
 import requests
 
-from hierad.config import ASR_URL as _CONFIG_ASR_URL, ASR_DIARIZE as _CONFIG_ASR_DIARIZE
+from hierad.config import (
+    ASR_DIARIZE as _CONFIG_ASR_DIARIZE,
+    ASR_URL as _CONFIG_ASR_URL,
+    get_asr_provider,
+)
 
-AsrBackend = Literal["auto", "service", "local"]
+AsrBackend = Literal["auto", "service", "local", "dashscope"]
 
 
 def extract_audio_from_video(
@@ -137,6 +141,20 @@ def transcribe_with_asr_service(
     return asr_result
 
 
+def transcribe_with_dashscope_asr(
+    audio_path: str,
+    output_json_path: Optional[str] = None,
+) -> "ASRResult":
+    from hierad.providers.asr import transcribe_with_dashscope
+
+    segments = transcribe_with_dashscope(audio_path)
+    asr_result = ASRResult(segments)
+    if output_json_path:
+        with open(output_json_path, "w", encoding="utf-8") as f:
+            json.dump({"segments": segments}, f, ensure_ascii=False, indent=2)
+    return asr_result
+
+
 def transcribe_with_whisper(
     audio_path: str,
     output_json_path: Optional[str] = None,
@@ -212,7 +230,7 @@ def transcribe_video(
         work_dir: 工作目录，默认视频同目录
         model_size: 本地 Whisper 模型（asr_backend=local 或 auto 兜底时）
         language: 本地 Whisper 语言
-        asr_backend: auto（先 HTTP 服务再本地）| service | local
+        asr_backend: auto（先 HTTP 服务再本地）| service | local | dashscope
         asr_url: 覆盖 ASR 服务 URL
         diarize: 是否说话人分离，默认 False（HierAD 不需要）
 
@@ -230,6 +248,8 @@ def transcribe_video(
         output_json_path = str(work_dir / f"{video_path.stem}_asr.json")
 
     use_diarize = _CONFIG_ASR_DIARIZE if diarize is None else diarize
+    if asr_backend == "auto" and get_asr_provider() == "dashscope":
+        asr_backend = "dashscope"
 
     if progress_callback:
         progress_callback("提取音频")
@@ -246,6 +266,11 @@ def transcribe_video(
                 output_json_path=output_json_path,
                 model_size=model_size,
                 language=language,
+            )
+        elif asr_backend == "dashscope":
+            result = transcribe_with_dashscope_asr(
+                audio_path,
+                output_json_path=output_json_path,
             )
         elif asr_backend == "service":
             result = transcribe_with_asr_service(

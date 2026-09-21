@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import json
 import re
+from pathlib import Path
 from typing import Dict, List, Optional
 
 from hierad.config import LLM_BASE_URL, LLM_MODEL
@@ -36,6 +37,38 @@ def _parse_fallback(raw: str) -> Dict[str, str]:
         except json.JSONDecodeError:
             pass
     return {"setting": "", "characters": "", "action": raw[:200], "raw": raw}
+
+
+def _load_checkpoint(path: Optional[str]) -> Dict[int, ClipDescription]:
+    if not path:
+        return {}
+    p = Path(path)
+    if not p.is_file():
+        return {}
+    try:
+        with open(p, "r", encoding="utf-8") as f:
+            data = json.load(f)
+    except (OSError, json.JSONDecodeError):
+        return {}
+    if not isinstance(data, list):
+        return {}
+    out: Dict[int, ClipDescription] = {}
+    for item in data:
+        if not isinstance(item, dict):
+            continue
+        desc = ClipDescription.from_dict(item)
+        if desc.is_complete():
+            out[desc.clip_idx] = desc
+    return out
+
+
+def _save_checkpoint(path: Optional[str], clips: List[ClipDescription]) -> None:
+    if not path:
+        return
+    p = Path(path)
+    p.parent.mkdir(parents=True, exist_ok=True)
+    with open(p, "w", encoding="utf-8") as f:
+        json.dump([c.to_dict() for c in clips], f, ensure_ascii=False, indent=2)
 
 
 class Stage1SceneUnderstanding:
@@ -76,8 +109,10 @@ class Stage1SceneUnderstanding:
         clip_manifest: List[dict],
         reporter: Optional[ProgressReporter] = None,
         show_progress: bool = False,
+        checkpoint_path: Optional[str] = None,
     ) -> List[ClipDescription]:
-        """VLM 逐场景 clip 结构化描述"""
+        """VLM 逐场景 clip 结构化描述；checkpoint_path 存在则跳过已完成的 clip。"""
+        cached = _load_checkpoint(checkpoint_path)
         descriptions: List[ClipDescription] = []
         for item in progress_iter(
             clip_manifest,
@@ -92,6 +127,9 @@ class Stage1SceneUnderstanding:
             tc = item.get("timecode", "")
             tc_parts = tc.split(" --> ") if " --> " in tc else ["", ""]
             dialogue = item.get("dialogue_overlap", "(None)")
+            if idx in cached:
+                descriptions.append(cached[idx])
+                continue
             recent = self._build_recent_context(descriptions)
 
             fmt = dict(recent_context=recent, dialogue_overlap=dialogue or "(None)")
@@ -137,6 +175,9 @@ class Stage1SceneUnderstanding:
                     video_path=item.get("video_path", ""),
                 )
             descriptions.append(desc)
+            if desc.is_complete():
+                _save_checkpoint(checkpoint_path, descriptions)
+        _save_checkpoint(checkpoint_path, descriptions)
         return descriptions
 
     def process(
@@ -144,9 +185,13 @@ class Stage1SceneUnderstanding:
         clip_manifest: List[dict],
         reporter: Optional[ProgressReporter] = None,
         show_progress: bool = False,
+        checkpoint_path: Optional[str] = None,
     ) -> tuple[List[ClipDescription], EnhancedGlobalContext]:
         clips = self.describe_clips(
-            clip_manifest, reporter=reporter, show_progress=show_progress
+            clip_manifest,
+            reporter=reporter,
+            show_progress=show_progress,
+            checkpoint_path=checkpoint_path,
         )
         if reporter:
             reporter.stage("Stage1 增强", message="LLM 全局上下文")

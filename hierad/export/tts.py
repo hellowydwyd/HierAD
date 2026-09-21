@@ -12,7 +12,7 @@ from typing import Any, Dict, List, Optional, Sequence, Tuple, Union
 
 import requests
 
-from hierad.config import TTS_SPK_ID, TTS_SPEED, TTS_URL
+from hierad.config import TTS_CLOUD_VOICE, TTS_SPK_ID, TTS_SPEED, TTS_URL, get_tts_provider
 
 
 _TC_RE = re.compile(
@@ -44,8 +44,19 @@ def synthesize_ad_clips(
     timeout: float = 180.0,
 ) -> List[str]:
     """
-    逐条调用 CosyVoice /inference_single，返回 wav 路径列表。
+    逐条调用 TTS，返回 wav 路径列表。
+    provider=local 时走本机 CosyVoice /inference_single；
+    provider=dashscope 时走百炼 CosyVoice 云端音色。
     """
+    if get_tts_provider() == "dashscope":
+        from hierad.providers.tts import synthesize_with_dashscope
+
+        return synthesize_with_dashscope(
+            list(texts),
+            Path(save_dir),
+            voice=TTS_CLOUD_VOICE,
+        )
+
     base = (tts_url or TTS_URL).rstrip("/")
     endpoint = f"{base}/inference_single"
     save_dir = Path(save_dir)

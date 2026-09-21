@@ -1,37 +1,57 @@
 # HierAD 配置示例
-# 复制为 config.yaml 并修改，或使用环境变量覆盖
+# 复制为项目根目录 config.yaml 并修改，或使用环境变量覆盖
+#
+# 默认全部走本机服务（与 VD-agent / services/registry.yaml 对齐）。
+# 某一环要上云时，只改对应 provider，其它环仍用本地。
 
-# VLM 配置（Stage 1 密集描述）
+# VLM（Stage 1 场景描述）
 vlm:
+  provider: "local"              # local | dashscope
   url: "http://localhost:8002"
-  type: "qwen2.5-vl"  # qwen2.5-vl | video-xl2 | videollama3
-  endpoint: "/prompted_inference"  # 不同 VLM 服务可能不同
+  type: "qwen2.5-vl"             # qwen2.5-vl | video-xl2 | videollama3
+  endpoint: "/prompted_inference"
+  # DashScope 时生效：
+  # model: "qwen3-vl-flash"
+  # fps: 1.0
+  # max_frames: 16
 
-# LLM 配置（Stage 2/3）
+# LLM（Stage1 增强 / Stage3 / 翻译）
 llm:
+  provider: "local"              # local | dashscope
   base_url: "http://127.0.0.1:8014/v1"
   model: "llama3-8b"
   api_key: "EMPTY"
+  # DashScope 时：model: "qwen-plus"，api_key 可用 DASHSCOPE_API_KEY
 
-# ASR（Whisper HTTP 服务；HierAD 默认不做说话人分离）
+# ASR（Whisper HTTP；HierAD 默认不做说话人分离）
 asr:
-  url: "http://127.0.0.1:8001/asr_recognize"  # 或 /asr_transcribe
-  diarize: false  # true 启用 pyannote（慢），或 HIERAD_ASR_DIARIZE=1
+  provider: "local"              # local | dashscope
+  url: "http://127.0.0.1:8001/asr_recognize"
+  diarize: false
+  # DashScope 时: model: "fun-asr-realtime"
 
 # CosyVoice TTS（AD 旁白）
 tts:
-  url: "http://127.0.0.1:8003"  # 或 HIERAD_TTS_URL
-  spk_id: "英文男"              # 或 HIERAD_TTS_SPK_ID；中文片可用「中文男」
-  speed: 1.2                    # 或 HIERAD_TTS_SPEED（0.5–2.0）
+  provider: "local"              # local | dashscope
+  url: "http://127.0.0.1:8003"
+  spk_id: "英文男"
+  speed: 1.2
+  voice_name: "康辉"             # 仅本机 CosyVoice / VD-agent 音色库
+  # DashScope 时:
+  # cloud_voice: "longxiaochun"
+  # model: "cosyvoice-v3-flash"
+
+# 百炼（仅 provider=dashscope 的环节会用到）
+# dashscope:
+#   api_key: ""                  # 或环境变量 DASHSCOPE_API_KEY
+#   base_url: "https://dashscope.aliyuncs.com/compatible-mode/v1"
 
 # TMDB（演员数据库）
 tmdb:
   api_key: ""  # 或设置 HIERAD_TMDB_API_KEY
   # 服务器无法直连外网：在你电脑 SSH 配置 RemoteForward 7897 127.0.0.1:7897
-  # 保持 SSH 连接后，服务器上用: HIERAD_TMDB_PROXY=http://127.0.0.1:7897
   # proxy: "http://127.0.0.1:7897"
 
-# 路径
 paths:
   actor_databases: "./actor_databases"
   work_dir: "./work_dir"

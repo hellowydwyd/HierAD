@@ -9,6 +9,7 @@ This repository is a **clean refactor** with clear boundaries between preprocess
 ## Table of contents
 
 - [What HierAD does](#what-hierad-does)
+- [Pipeline overview](#pipeline-overview)
 - [End-to-end workflow](#end-to-end-workflow)
 - [Pipeline stages (algorithms)](#pipeline-stages-algorithms)
 - [Project layout](#project-layout)
@@ -34,6 +35,12 @@ This repository is a **clean refactor** with clear boundaries between preprocess
    **Stage 3**: **LLM** refines each segment into a concise AD line using global context (characters, scene, narrative phase).
 
 Optional **canonical character names** from an actor DB improve consistency in Stage 1 when passed via `--canonical-characters`.
+
+---
+
+## Pipeline overview
+
+![HierAD pipeline](docs/pipeline.png)
 
 ---
 
@@ -154,16 +161,43 @@ pip install -e ".[asr,describe_extras]"
 
 **Precedence:** environment variables → optional `config.yaml` (project root or current working directory) → built-in defaults.
 
+Default **provider is `local`**: VLM/LLM/ASR/TTS talk to the services on this machine (`8002` / `8014` or `8016` / `8001` / `8003`). Cloud (Alibaba DashScope) is opt-in per component and does not replace local endpoints unless you set `provider: dashscope`.
+
+To send only some stages to the cloud:
+
+```yaml
+vlm:
+  provider: dashscope   # qwen3-vl-flash
+llm:
+  provider: dashscope   # qwen-plus
+asr:
+  provider: local       # keep Whisper at :8001
+tts:
+  provider: local       # keep CosyVoice at :8003
+```
+
+```bash
+export DASHSCOPE_API_KEY=sk-...
+hierad run --video movie.mp4 --vlm-provider dashscope --llm-provider dashscope
+```
+
+Install cloud extras with `pip install -e ".[cloud]"`. Stage1 writes `stage1_clip_descriptions.json` after each successful clip so a failed VLM call can resume.
+
 ### Environment variables
 
 | Variable | Description | Default |
 |----------|-------------|---------|
 | `HIERAD_VLM_URL` | Base URL of the VLM service | `http://localhost:8002` |
+| `HIERAD_VLM_PROVIDER` | `local` or `dashscope` | `local` |
 | `HIERAD_VLM_TYPE` | `qwen2.5-vl` / `video-xl2` / `videollama3` | `qwen2.5-vl` |
 | `HIERAD_VLM_ENDPOINT` | HTTP path for inference, e.g. `/prompted_inference` | `/prompted_inference` |
+| `HIERAD_LLM_PROVIDER` | `local` or `dashscope` | `local` |
 | `HIERAD_LLM_BASE_URL` | OpenAI-compatible API base URL | `http://127.0.0.1:11436/v1` |
 | `HIERAD_LLM_MODEL` | Model name for chat completions | `qwen2.5:7b` |
 | `HIERAD_LLM_API_KEY` | API key (use real key for gated endpoints) | `EMPTY` |
+| `DASHSCOPE_API_KEY` | 百炼 Key（仅 dashscope provider） | (empty) |
+| `HIERAD_ASR_PROVIDER` | `local` or `dashscope` | `local` |
+| `HIERAD_TTS_PROVIDER` | `local` or `dashscope` | `local` |
 | `HIERAD_TMDB_API_KEY` | TMDB key for `build-actor-db` | (empty) |
 | `HIERAD_ACTOR_DB_DIR` | Default output root for actor DBs | `./actor_databases` |
 

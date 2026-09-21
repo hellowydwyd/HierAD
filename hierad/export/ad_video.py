@@ -15,6 +15,7 @@ from hierad.config import (
     TTS_VOICE_ID,
     TTS_VOICE_NAME,
     TRANSLATE_ZH,
+    get_tts_provider,
 )
 from hierad.preprocess.gap_segments import get_video_duration
 
@@ -279,24 +280,25 @@ def export_ad_video(
         else work_dir / f"{video_path.stem}_ad.mp4"
     )
 
-    # 解析音色：显式 voice_id > voice_name/配置名（康辉）> 配置 voice_id
+    # 解析音色：本机 CosyVoice 走 VD-agent 库；百炼用系统音色，不查本地 DB
     resolved_voice = voice_id or TTS_VOICE_ID or None
     resolved_prompt = prompt_text
     voice_display = ""
     lookup_key = voice_name or (None if voice_id else TTS_VOICE_NAME)
-    if not resolved_voice and lookup_key:
-        vid, ptxt, vname = resolve_voice_id_and_prompt(lookup_key)
-        resolved_voice = vid
-        if resolved_prompt is None:
-            resolved_prompt = ptxt
-        voice_display = vname or lookup_key
-    elif resolved_voice and not voice_display:
-        # 仍尝试取 prompt
-        if resolved_prompt is None:
-            _vid, ptxt, vname = resolve_voice_id_and_prompt(resolved_voice)
-            if ptxt:
+    if get_tts_provider() != "dashscope":
+        if not resolved_voice and lookup_key:
+            vid, ptxt, vname = resolve_voice_id_and_prompt(lookup_key)
+            resolved_voice = vid
+            if resolved_prompt is None:
                 resolved_prompt = ptxt
-            voice_display = vname or resolved_voice
+            voice_display = vname or lookup_key
+        elif resolved_voice and not voice_display:
+            # 仍尝试取 prompt
+            if resolved_prompt is None:
+                _vid, ptxt, vname = resolve_voice_id_and_prompt(resolved_voice)
+                if ptxt:
+                    resolved_prompt = ptxt
+                voice_display = vname or resolved_voice
 
     # 有克隆音色时不用 SFT spk_id
     resolved_spk = None if resolved_voice else (spk_id if spk_id is not None else TTS_SPK_ID or None)
